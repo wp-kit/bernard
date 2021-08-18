@@ -1,5 +1,5 @@
 {
-    "name": "bernard/bernard",
+    "name": "wp-kit/bernard",
     "description": "Message queue abstraction layer",
     "license": "MIT",
     "keywords": ["message queue", "message", "queue", "bernard"],
