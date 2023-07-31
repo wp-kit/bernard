@@ -7,6 +7,9 @@ use Bernard\Event\EnvelopeEvent;
 use Bernard\Event\PingEvent;
 use Bernard\Event\RejectEnvelopeEvent;
 
+/**
+ * @package Consumer
+ */
 class Consumer
 {
     protected $router;
@@ -32,14 +35,14 @@ class Consumer
     }
 
     /**
-     * Starts an infinite loop calling Consumer::tick();.
+     * Starts an infinite loop calling Consumer::tick();
      *
      * @param Queue $queue
      * @param array $options
      */
     public function consume(Queue $queue, array $options = [])
     {
-        declare(ticks=1);
+        declare (ticks = 1);
 
         $this->bind();
 
@@ -73,7 +76,7 @@ class Consumer
             return true;
         }
 
-        $this->dispatcher->dispatch(BernardEvents::PING, new PingEvent($queue));
+        $this->dispatcher->dispatch(new PingEvent($queue), BernardEvents::PING);
 
         if (!$envelope = $queue->dequeue()) {
             return !$this->options['stop-when-empty'];
@@ -85,11 +88,11 @@ class Consumer
             return true;
         }
 
-        return (bool) --$this->options['max-messages'];
+        return (boolean) --$this->options['max-messages'];
     }
 
     /**
-     * Mark Consumer as shutdown.
+     * Mark Consumer as shutdown
      */
     public function shutdown()
     {
@@ -97,7 +100,7 @@ class Consumer
     }
 
     /**
-     * Pause consuming.
+     * Pause consuming
      */
     public function pause()
     {
@@ -105,7 +108,7 @@ class Consumer
     }
 
     /**
-     * Resume consuming.
+     * Resume consuming
      */
     public function resume()
     {
@@ -125,15 +128,15 @@ class Consumer
     public function invoke(Envelope $envelope, Queue $queue)
     {
         try {
-            $this->dispatcher->dispatch(BernardEvents::INVOKE, new EnvelopeEvent($envelope, $queue));
+            $this->dispatcher->dispatch(new EnvelopeEvent($envelope, $queue), BernardEvents::INVOKE);
 
-            $receiver = $this->router->route($envelope);
-            $receiver->receive($envelope->getMessage());
+            // for 5.3 support where a function name is not a callable
+            call_user_func($this->router->map($envelope), $envelope->getMessage());
 
             // We successfully processed the message.
             $queue->acknowledge($envelope);
 
-            $this->dispatcher->dispatch(BernardEvents::ACKNOWLEDGE, new EnvelopeEvent($envelope, $queue));
+            $this->dispatcher->dispatch(new EnvelopeEvent($envelope, $queue), BernardEvents::ACKNOWLEDGE);
         } catch (\Throwable $error) {
             $this->rejectDispatch($error, $envelope, $queue);
         } catch (\Exception $exception) {
@@ -143,6 +146,8 @@ class Consumer
 
     /**
      * @param array $options
+     *
+     * @return void
      */
     protected function configure(array $options)
     {
@@ -166,7 +171,7 @@ class Consumer
     {
         if (function_exists('pcntl_signal')) {
             pcntl_signal(SIGTERM, [$this, 'shutdown']);
-            pcntl_signal(SIGINT, [$this, 'shutdown']);
+            pcntl_signal(SIGINT,  [$this, 'shutdown']);
             pcntl_signal(SIGQUIT, [$this, 'shutdown']);
             pcntl_signal(SIGUSR2, [$this, 'pause']);
             pcntl_signal(SIGCONT, [$this, 'resume']);
@@ -175,6 +180,7 @@ class Consumer
 
     /**
      * @param \Throwable|\Exception $exception note that the type-hint is missing due to PHP 5.x compat
+     *
      * @param Envelope              $envelope
      * @param Queue                 $queue
      *
@@ -187,7 +193,7 @@ class Consumer
         // Previously failing jobs handling have been moved to a middleware.
         //
         // Emit an event to let others log that exception
-        $this->dispatcher->dispatch(BernardEvents::REJECT, new RejectEnvelopeEvent($envelope, $queue, $exception));
+        $this->dispatcher->dispatch(new RejectEnvelopeEvent($envelope, $queue, $exception), BernardEvents::REJECT);
 
         if ($this->options['stop-on-error']) {
             throw $exception;
